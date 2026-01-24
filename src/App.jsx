@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import Editor, { useMonaco } from '@monaco-editor/react';
 import { 
   FileJson, 
   Upload, 
@@ -39,10 +40,12 @@ export default function App() {
   const [validationResult, setValidationResult] = useState(null);
   const [error, setError] = useState(null);
   const [dragActive, setDragActive] = useState(false);
-  const [lineErrors, setLineErrors] = useState({});
   const [fixSuccess, setFixSuccess] = useState(false);
   const [theme, setTheme] = useState('dark');
   const fileInputRef = useRef(null);
+  const editorRef = useRef(null);
+  const timerRef = useRef(null);
+  const monaco = useMonaco();
 
   // Auto-save/restore from localStorage
   useEffect(() => {
@@ -77,6 +80,40 @@ export default function App() {
     localStorage.setItem('theme', theme);
   }, [theme]);
 
+  // Sync Monaco Markers
+  useEffect(() => {
+    if (monaco && editorRef.current && validationResult) {
+      const model = editorRef.current.getModel();
+      const markers = [];
+      const text = model.getValue();
+      const lines = text.split('\n');
+
+      const allIssues = [...validationResult.errors, ...validationResult.warnings];
+      
+      allIssues.forEach(err => {
+        const pathParts = err.path.split('.').filter(p => p !== '$');
+        const lastPart = pathParts[pathParts.length - 1];
+        
+        for (let i = 0; i < lines.length; i++) {
+          if (lines[i].includes(`"${lastPart}"`)) {
+            const colStart = lines[i].indexOf(`"${lastPart}"`) + 1;
+            markers.push({
+              startLineNumber: i + 1,
+              startColumn: colStart,
+              endLineNumber: i + 1,
+              endColumn: colStart + lastPart.length + 2,
+              message: `${err.message}${err.hint ? `\n\nHint: ${err.hint}` : ''}`,
+              severity: validationResult.errors.includes(err) ? monaco.MarkerSeverity.Error : monaco.MarkerSeverity.Warning
+            });
+            break;
+          }
+        }
+      });
+
+      monaco.editor.setModelMarkers(model, "dtcg-validator", markers);
+    }
+  }, [monaco, validationResult]); // Removed jsonText from deps to prevent infinite loop or over-triggering
+
   // Sync Theme with JSON content
   useEffect(() => {
     if (jsonData) {
@@ -84,31 +121,10 @@ export default function App() {
     }
   }, [jsonData]);
 
-  const mapErrorsToLines = (text, errors) => {
-    if (!text || !errors || errors.length === 0) return {};
-    const lines = text.split('\n');
-    const errorMap = {};
-    
-    errors.forEach(err => {
-      const pathParts = err.path.split('.').filter(p => p !== '$');
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
-        const lastPart = pathParts[pathParts.length - 1];
-        if (line.includes(`"${lastPart}"`)) {
-          if (!errorMap[i]) errorMap[i] = [];
-          errorMap[i].push(err);
-          break;
-        }
-      }
-    });
-    return errorMap;
-  };
-
   const validateJson = (text) => {
     if (!text.trim()) {
       setJsonData(null);
       setValidationResult(null);
-      setLineErrors({});
       return;
     }
 
@@ -120,23 +136,40 @@ export default function App() {
       const validator = new DTCGValidator();
       const result = validator.validate(parsed);
       setValidationResult(result);
-      
-      const allErrors = [...result.errors, ...result.warnings];
-      setLineErrors(mapErrorsToLines(text, allErrors));
     } catch (e) {
       setError(e.message);
       setJsonData(null);
       setValidationResult(null);
-      setLineErrors({});
     }
   };
 
   const handleJsonChange = (text) => {
+    if (text === undefined) return;
     setJsonText(text);
     localStorage.setItem('brand-json-validator-content', text);
-    // Debounced validation
-    const timer = setTimeout(() => validateJson(text), 500);
-    return () => clearTimeout(timer);
+    
+    // Debounced validation using ref
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => validateJson(text), 500);
+  };
+
+  const handleDrag = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === "dragenter" || e.type === "dragover") {
+      setDragActive(true);
+    } else if (e.type === "dragleave") {
+      setDragActive(false);
+    }
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      handleFileInput(e.dataTransfer.files[0]);
+    }
   };
 
   const handleFileInput = (file) => {
@@ -147,6 +180,19 @@ export default function App() {
       validateJson(text);
     };
     reader.readAsText(file);
+  };
+
+  const handleExport = () => {
+    if (!jsonText) return;
+    const blob = new Blob([jsonText], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = jsonData?.name ? `${jsonData.name.toLowerCase()}-brand.json` : 'brand.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   const handleAutoFix = () => {
@@ -235,7 +281,7 @@ export default function App() {
               </Button>
             )}
 
-            <Button size="sm" onClick={() => {/* download */}} disabled={!jsonText} className="h-9 px-4 rounded-xl font-bold">
+            <Button size="sm" onClick={handleExport} disabled={!jsonText} className="h-9 px-4 rounded-xl font-bold">
               <Download className="w-4 h-4 mr-2" />
               Export
             </Button>
@@ -243,12 +289,29 @@ export default function App() {
         </header>
 
         {/* Main Workspace */}
-        <main className="flex-1 mt-24 flex gap-4 p-4 overflow-hidden max-w-[1600px] mx-auto w-full">
+        <main className="flex-1 pt-24 pb-4 flex gap-4 px-4 overflow-hidden max-w-[1600px] mx-auto w-full">
           {/* Editor Surface */}
-          <section className={cn(
-            "flex-1 relative flex flex-col bg-card border rounded-3xl overflow-hidden shadow-sm transition-all duration-500",
-            dragActive && "ring-2 ring-primary bg-primary/5"
-          )}>
+          <section 
+            onDragEnter={handleDrag}
+            onDragOver={handleDrag}
+            onDragLeave={handleDrag}
+            onDrop={handleDrop}
+            className={cn(
+              "flex-1 relative flex flex-col bg-card border rounded-3xl overflow-hidden shadow-sm transition-all duration-500",
+              dragActive && "ring-2 ring-primary bg-primary/5 scale-[0.99]"
+            )}
+          >
+            {/* Drag Overlay */}
+            {dragActive && (
+              <div className="absolute inset-0 z-50 bg-primary/10 backdrop-blur-sm flex flex-col items-center justify-center border-2 border-dashed border-primary rounded-3xl pointer-events-none animate-in fade-in zoom-in duration-300">
+                <div className="w-20 h-20 bg-primary rounded-3xl flex items-center justify-center shadow-2xl animate-bounce">
+                  <Upload className="w-10 h-10 text-primary-foreground" />
+                </div>
+                <h2 className="mt-6 text-xl font-bold tracking-tight">Drop your JSON</h2>
+                <p className="text-sm text-muted-foreground font-medium uppercase tracking-widest mt-2">Release to validate</p>
+              </div>
+            )}
+
             <div className="h-12 border-b flex items-center justify-between px-6 bg-muted/30">
               <div className="flex items-center gap-3">
                 <Code2 className="w-4 h-4 text-muted-foreground" />
@@ -265,33 +328,41 @@ export default function App() {
               )}
             </div>
 
-            <div className="flex-1 flex overflow-hidden">
-              {/* Line Indicator */}
-              <div className="w-12 bg-muted/10 border-r flex flex-col py-4 font-mono text-[10px] text-muted-foreground/50 select-none items-center">
-                {jsonText.split('\n').map((_, i) => (
-                  <div key={i} className={cn(
-                    "h-6 flex items-center justify-center w-full transition-colors",
-                    lineErrors[i] && "text-destructive font-bold bg-destructive/5"
-                  )}>
-                    {i + 1}
-                  </div>
-                ))}
-              </div>
-
-              <textarea
+            <div className="flex-1 overflow-hidden">
+              <Editor
+                height="100%"
+                defaultLanguage="json"
+                theme={theme === 'dark' ? 'vs-dark' : 'light'}
                 value={jsonText}
-                onChange={(e) => handleJsonChange(e.target.value)}
-                spellCheck={false}
-                className="flex-1 p-4 bg-transparent font-mono text-sm leading-6 resize-none outline-none text-card-foreground placeholder:text-muted-foreground"
-                placeholder="// Drop your brand configuration here..."
+                onChange={handleJsonChange}
+                onMount={(editor) => {
+                  editorRef.current = editor;
+                }}
+                options={{
+                  minimap: { enabled: false },
+                  scrollBeyondLastLine: false,
+                  fontSize: 13,
+                  fontFamily: 'JetBrains Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+                  lineHeight: 24,
+                  padding: { top: 16 },
+                  folding: true,
+                  bracketPairColorization: { enabled: true },
+                  automaticLayout: true,
+                  wordWrap: 'on',
+                  cursorSmoothCaretAnimation: 'on',
+                  smoothScrolling: true,
+                  glyphMargin: true,
+                  lineNumbersMinChars: 4,
+                  renderLineHighlight: 'all',
+                }}
               />
             </div>
           </section>
 
           {/* Inspection Panel */}
-          <aside className="w-96 flex flex-col bg-card border rounded-3xl overflow-hidden shadow-sm">
-            <Tabs defaultValue="issues" className="flex-1 flex flex-col">
-              <div className="p-4">
+          <aside className="w-96 flex flex-col bg-card border rounded-3xl overflow-hidden shadow-sm min-h-0">
+            <Tabs defaultValue="issues" className="flex-1 flex flex-col min-h-0">
+              <div className="p-4 shrink-0">
                 <TabsList className="w-full h-11 grid grid-cols-2 rounded-xl p-1 bg-muted/50">
                   <TabsTrigger value="issues" className="rounded-lg gap-2 text-xs font-bold uppercase tracking-wider data-[state=active]:bg-background data-[state=active]:shadow-sm">
                     <AlertCircle className="w-3.5 h-3.5" />
@@ -304,9 +375,9 @@ export default function App() {
                 </TabsList>
               </div>
 
-              <TabsContent value="issues" className="flex-1 min-h-0 mt-0 data-[state=active]:flex flex-col">
-                <ScrollArea className="flex-1 px-4">
-                  <div className="space-y-4 pb-4">
+              <TabsContent value="issues" className="flex-1 min-h-0 mt-0 data-[state=active]:flex flex-col overflow-hidden">
+                <ScrollArea className="flex-1">
+                  <div className="p-4 space-y-4 pb-4">
                     {!validationResult ? (
                       <div className="flex flex-col items-center justify-center h-64 text-center">
                         <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mb-4">
@@ -345,9 +416,9 @@ export default function App() {
                 </ScrollArea>
               </TabsContent>
 
-              <TabsContent value="preview" className="flex-1 min-h-0 mt-0 data-[state=active]:flex flex-col">
-                <ScrollArea className="flex-1 px-4">
-                  <div className="space-y-2 pb-4">
+              <TabsContent value="preview" className="flex-1 min-h-0 mt-0 data-[state=active]:flex flex-col overflow-hidden">
+                <ScrollArea className="flex-1">
+                  <div className="p-4 space-y-2 pb-4">
                     {jsonData ? (
                       Object.keys(jsonData).filter(k => !k.startsWith('$')).map(key => (
                         <div key={key} className="space-y-2">
@@ -368,14 +439,26 @@ export default function App() {
 
             <div className="p-6 border-t bg-muted/20 flex items-center justify-between">
               <div className="flex gap-3">
-                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground">
-                  <Github className="w-4 h-4" />
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground"
+                  asChild
+                >
+                  <a href="https://github.com/pabliqe/brand-json-validator" target="_blank" rel="noreferrer">
+                    <Github className="w-4 h-4" />
+                  </a>
                 </Button>
                 <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground">
                   <ExternalLink className="w-4 h-4" />
                 </Button>
               </div>
-              <span className="text-[10px] font-bold text-muted-foreground/50 uppercase tracking-widest">Build {pkg.version}</span>
+              <div className="flex flex-col items-end gap-0.5">
+                <span className="text-[9px] font-bold text-muted-foreground/60 uppercase tracking-tight">
+                  Made by <a href="https://x.com/pabliqe" target="_blank" rel="noreferrer" className="text-primary hover:underline">Pablo Armen</a>
+                </span>
+                <span className="text-[9px] font-bold text-muted-foreground/30 uppercase tracking-widest">Build {pkg.version}</span>
+              </div>
             </div>
           </aside>
         </main>
