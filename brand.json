@@ -1,0 +1,96 @@
+{
+  "brand": {
+    "name": "Brand JSON Validator (DTCG)",
+    "siteTitle": "Pablo Armen",
+    "siteUrl": "https://mybrand.com",
+    "description": "Generate and standarize your brand tokens in JSON."
+  },
+  "colors": {
+    "primary": {
+      "value": "#E00069",
+      "$type": "color"
+    },
+    "secondary": {
+      "blue": {
+        "value": "#4c53fb",
+        "$type": "color"
+      },
+      "orange": {
+        "value": "#ff7145",
+        "$type": "color"
+      }
+    },
+    "neutral": {
+      "50": {
+        "value": "#fffdfd",
+        "$type": "color"
+      },
+      "100": {
+        "value": "#f9f6f6",
+        "$type": "color"
+      },
+      "500": {
+        "value": "#a8a4a4",
+        "$type": "color"
+      },
+      "900": {
+        "value": "#443d3d",
+        "$type": "color"
+      }
+    }
+  },
+  "typography": {
+    "fontFamilies": {
+      "primary": {
+        "value": "Inter",
+        "$type": "fontFamily"
+      },
+      "secondary": {
+        "value": "Roboto",
+        "$type": "fontFamily"
+      }
+    },
+    "fontSize": {
+      "heading": {
+        "value": "32px",
+        "$type": "fontSize"
+      },
+      "body": {
+        "value": "16px",
+        "$type": "fontSize"
+      },
+      "caption": {
+        "value": "12px",
+        "$type": "fontSize"
+      }
+    },
+    "fontWeight": {
+      "bold": {
+        "value": "700",
+        "$type": "fontWeight"
+      },
+      "regular": {
+        "value": "400",
+        "$type": "fontWeight"
+      }
+    }
+  },
+  "spacing": {
+    "small": {
+      "value": "8px",
+      "$type": "dimension"
+    },
+    "medium": {
+      "value": "16px",
+      "$type": "dimension"
+    },
+    "large": {
+      "value": "32px",
+      "$type": "dimension"
+    },
+    "xlarge": {
+      "value": "64px",
+      "$type": "dimension"
+    }
+  }
+}

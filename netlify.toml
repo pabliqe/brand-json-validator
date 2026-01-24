@@ -1,0 +1,12 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[context.production.environment]
+  VITE_GEMINI_API_KEY = ""
+  VITE_GEMINI_MODEL = "gemini-2.0-flash"
