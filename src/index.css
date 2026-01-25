@@ -72,3 +72,17 @@
 ::-webkit-scrollbar-thumb:hover {
   @apply bg-muted-foreground/30;
 }
+
+/* Prevent Radix ScrollArea content from forcing table layout that overflows cards */
+[data-radix-scroll-area-viewport] > div {
+  display: block !important;
+  min-width: 100%;
+}
+
+.monaco-editor .monaco-line-highlight-glow {
+  background-color: rgba(125, 211, 252, 0.18);
+}
+
+.monaco-editor .monaco-line-highlight-glow-margin {
+  border-left: 3px solid rgba(125, 211, 252, 0.8);
+}

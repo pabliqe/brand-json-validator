@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { ChevronDown, ChevronRight, Type, Palette, Layout, Hash } from 'lucide-react';
+import { ChevronDown, ChevronRight, Type, Palette, Layout, Hash, Copy, Check } from 'lucide-react';
 import { cn } from '../lib/utils';
 
-export function TokenPreview({ node, name }) {
+export function TokenPreview({ node, name, path = [], onFocusPath }) {
   const [open, setOpen] = useState(true);
+  const [copied, setCopied] = useState(false);
 
   // Is Token (leaf node)?
   if (node && node.hasOwnProperty('$value')) {
@@ -32,16 +33,40 @@ export function TokenPreview({ node, name }) {
       preview = <Hash className="w-3.5 h-3.5 text-muted-foreground" />;
     }
 
+    const handleCopy = async (e) => {
+      e.stopPropagation();
+      try {
+        await navigator.clipboard.writeText(typeof val === 'object' ? JSON.stringify(val, null, 2) : String(val));
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1200);
+      } catch (err) {
+        console.error('Copy failed', err);
+      }
+    };
+
     return (
-      <div className="flex items-center justify-between py-2 px-3 hover:bg-muted/50 group/token rounded-xl transition-all duration-200 border border-transparent hover:border-border/50">
+      <div
+        className="flex items-center justify-between py-2 px-3 hover:bg-muted/50 group/token rounded-xl transition-all duration-200 border border-transparent hover:border-border/50 cursor-pointer"
+        onClick={() => onFocusPath?.(path)}
+      >
         <div className="flex flex-col min-w-0">
           <span className="text-xs font-bold text-foreground/80 group-hover/token:text-foreground">{name}</span>
           <span className="text-[10px] text-muted-foreground font-mono truncate max-w-[120px]">
             {valueDisplay}
           </span>
         </div>
-        <div className="flex-shrink-0 bg-background rounded-lg p-1.5 shadow-sm border">
-          {preview}
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleCopy}
+            className="h-8 w-8 flex items-center justify-center rounded-lg border bg-background text-muted-foreground hover:text-foreground hover:border-foreground/40 transition-colors"
+            aria-label="Copy token value"
+          >
+            {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+          </button>
+          <div className="flex-shrink-0 bg-background rounded-lg p-1.5 shadow-sm border">
+            {preview}
+          </div>
         </div>
       </div>
     );
@@ -71,7 +96,7 @@ export function TokenPreview({ node, name }) {
         
         {open && (
           <div className="ml-4 pl-2 border-l border-border/50 space-y-1 mt-1 animate-in slide-in-from-left-1 duration-200">
-            {keys.map(k => <TokenPreview key={k} name={k} node={node[k]} />)}
+            {keys.map(k => <TokenPreview key={k} name={k} node={node[k]} path={[...path, k]} onFocusPath={onFocusPath} />)}
           </div>
         )}
       </div>
