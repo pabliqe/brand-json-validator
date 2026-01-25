@@ -16,14 +16,30 @@ export function TokenPreview({ node, name, path = [], onFocusPath }) {
 
     // Handle color type
     if (type === 'color' || (typeof val === 'string' && (val.startsWith('#') || val.startsWith('hsl') || val.startsWith('rgb')))) {
-      const colorValue = typeof val === 'string' ? val : (val?.hex || '#ffffff');
+      let colorValue = '#ffffff';
+      
+      if (typeof val === 'string') {
+        colorValue = val;
+      } else if (val?.colorSpace === 'srgb' && val?.channels) {
+        // Convert sRGB object back to hex for display
+        const { r, g, b } = val.channels;
+        const toHex = (n) => Math.round(n * 255).toString(16).padStart(2, '0');
+        colorValue = `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+        valueDisplay = colorValue;
+      } else if (val?.hex) {
+        colorValue = val.hex;
+      }
+      
       preview = (
         <div 
           className="w-4 h-4 rounded-full shadow-sm border ring-2 ring-background ring-offset-1" 
           style={{ backgroundColor: colorValue }}
         />
       );
-      valueDisplay = colorValue;
+      
+      if (typeof val === 'string') {
+        valueDisplay = val;
+      }
     } else if (type === 'fontFamily') {
       preview = <Type className="w-3.5 h-3.5 text-primary" />;
     } else if (type === 'dimension' || type === 'spacing') {

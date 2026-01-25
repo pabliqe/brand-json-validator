@@ -895,11 +895,21 @@ export class DTCGValidator {
       const resolvedType = hasDollarType ? node.$type : (hasType ? node.type : (parentType || this.inferTokenType(val)));
 
       if (resolvedType === 'color' && typeof val === 'string') {
-        newNode.$value = this.convertToColorObject(val);
+        // Keep hex/color strings as-is for better readability
+        newNode.$value = val;
       } else if (resolvedType === 'dimension' && typeof val === 'string') {
         newNode.$value = this.parseDimension(val);
       } else if ((resolvedType === 'number' || resolvedType === 'opacity') && typeof val === 'string' && /^-?[\d.]+$/.test(val)) {
-        newNode.$value = parseFloat(val);
+        const numVal = parseFloat(val);
+        // For opacity, clamp to valid range
+        if (resolvedType === 'opacity') {
+          newNode.$value = Math.max(0, Math.min(1, numVal));
+        } else {
+          newNode.$value = numVal;
+        }
+      } else if (resolvedType === 'opacity' && typeof val === 'number') {
+        // Ensure existing numeric opacity values are within valid range
+        newNode.$value = Math.max(0, Math.min(1, val));
       } else {
         newNode.$value = val;
       }
