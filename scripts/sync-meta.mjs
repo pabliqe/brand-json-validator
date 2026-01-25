@@ -68,8 +68,9 @@ async function syncMeta() {
   const brandRaw = await readFile(brandPath, 'utf8')
   const brand = JSON.parse(brandRaw)
 
-  const siteUrl = (brand?.brand?.siteUrl || '').replace(/\/$/, '')
-  const ogImageUrl = siteUrl ? `${siteUrl}/og-image.png` : '/og-image.png'
+  // Prefer absolute URL for social crawlers: Netlify env → brand.siteUrl → root-relative fallback
+  const baseUrl = (process.env.URL || process.env.DEPLOY_URL || brand?.brand?.siteUrl || '').replace(/\/$/, '')
+  const ogImageUrl = baseUrl ? `${baseUrl}/og-image.png` : '/og-image.png'
 
   const htmlPath = detection.htmlPath
   console.log(`[sync-meta] Updating: ${path.relative(rootDir, htmlPath)}`)
