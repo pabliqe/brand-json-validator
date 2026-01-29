@@ -31,7 +31,15 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './comp
 
 // Existing Components
 import { TokenPreview } from './components/TokenPreview';
+
+
 import pkg from '../package.json';
+import { WelcomeModal } from './components/WelcomeModal';
+
+// Helper to get primary color from brand.json structure
+function getPrimaryColor(jsonData) {
+  return jsonData?.colors?.primary?.value || '#E00069';
+}
 
 export default function App() {
   const [jsonText, setJsonText] = useState('');
@@ -261,7 +269,10 @@ export default function App() {
       registerMonacoThemes(monaco);
       monaco.editor.setTheme(theme === 'dark' ? 'custom-dark' : 'custom-light');
     }
-  }, [theme, monaco, registerMonacoThemes]);
+    // Set CSS variable for primary color
+    const color = getPrimaryColor(jsonData);
+    document.documentElement.style.setProperty('--primary', color);
+  }, [theme, monaco, registerMonacoThemes, jsonData]);
 
   useEffect(() => () => {
     if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
@@ -404,13 +415,15 @@ export default function App() {
   };
 
   return (
-    <TooltipProvider>
-      <div className="h-screen flex flex-col bg-background text-foreground overflow-hidden">
+    <>
+      <WelcomeModal />
+      <TooltipProvider>
+        <div className="h-screen flex flex-col bg-background text-foreground overflow-hidden">
         {/* Floating Topbar */}
         <header className="fixed top-4 inset-x-4 max-w-[1600px] mx-auto h-16 border rounded-2xl bg-background/80 backdrop-blur-xl z-50 flex items-center justify-between px-6 shadow-2xl">
           <div className="flex items-center gap-4">
-            <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center shadow-lg shadow-primary/20">
-              <FileJson className="w-6 h-6 text-primary-foreground" />
+            <div className="w-10 h-10 bg-[var(--primary)] rounded-xl flex items-center justify-center shadow-lg" style={{ boxShadow: '0 4px 16px 0 var(--primary, #E00069)20' }}>
+              <FileJson className="w-6 h-6 text-white" />
             </div>
             <div>
               <h1 className="text-sm font-bold tracking-tight">BRAND DESIGN TOOL</h1>
@@ -455,14 +468,19 @@ export default function App() {
 
             <Separator orientation="vertical" className="h-8 mx-1" />
 
-            <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} className="h-9 gap-2 rounded-xl">
+            <Button
+              variant="brand"
+              size="sm"
+              onClick={() => fileInputRef.current?.click()}
+              className="h-9 gap-2 rounded-xl"
+            >
               <Upload className="w-4 h-4" />
               Upload
             </Button>
             
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" onClick={() => { setJsonText(''); setJsonData(null); }} className="h-9 w-9 rounded-xl hover:bg-destructive/10 hover:text-destructive">
+                <Button variant="ghost" size="icon" onClick={() => { setJsonText(''); setJsonData(null); setValidationResult(null); if (fileInputRef.current) fileInputRef.current.value = ''; }} className="h-9 w-9 rounded-xl hover:bg-destructive/10 hover:text-destructive">
                   <Trash2 className="w-4 h-4" />
                 </Button>
               </TooltipTrigger>
@@ -471,20 +489,39 @@ export default function App() {
 
             <Separator orientation="vertical" className="h-8 mx-1" />
 
-            {validationResult && !validationResult.valid && (
-              <Button 
-                onClick={handleAutoFix}
-                className={cn(
-                  "h-9 px-4 rounded-xl gap-2 transition-all duration-500",
-                  fixSuccess ? "bg-green-600 hover:bg-green-700" : "bg-primary hover:bg-primary/90"
-                )}
-              >
-                <Sparkles className={cn("w-4 h-4", fixSuccess && "animate-spin")} />
-                {fixSuccess ? "System Fixed" : "Magic Fix"}
-              </Button>
+
+            {validationResult && (
+              validationResult.valid ? (
+                <Button 
+                  variant="brand"
+                  disabled
+                  className="h-9 px-4 rounded-xl gap-2 bg-green-600 hover:bg-green-700 text-white border-green-700"
+                >
+                  <CheckCircle2 className="w-4 h-4 text-white" />
+                  Format OK!
+                </Button>
+              ) : (
+                <Button 
+                  variant="brand"
+                  onClick={handleAutoFix}
+                  className={cn(
+                    "h-9 px-4 rounded-xl gap-2 transition-all duration-500",
+                    fixSuccess && "bg-green-600 hover:bg-green-700"
+                  )}
+                >
+                  <Sparkles className={cn("w-4 h-4", fixSuccess ? "text-white animate-spin" : "text-white")}/>
+                  {fixSuccess ? "System Fixed" : "Magic Fix"}
+                </Button>
+              )
             )}
 
-            <Button size="sm" onClick={handleExport} disabled={!jsonText} className="h-9 px-4 rounded-xl font-bold">
+            <Button
+              variant="brand"
+              size="sm"
+              onClick={handleExport}
+              disabled={!jsonText}
+              className="h-9 px-4 rounded-xl font-bold"
+            >
               <Download className="w-4 h-4 mr-2" />
               Export
             </Button>
@@ -663,7 +700,8 @@ export default function App() {
           className="hidden" 
           accept=".json" 
         />
-      </div>
-    </TooltipProvider>
+        </div>
+      </TooltipProvider>
+    </>
   );
 }

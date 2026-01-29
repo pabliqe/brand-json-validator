@@ -8,14 +8,14 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default:
-          "bg-primary text-primary-foreground shadow hover:bg-primary/90",
-        destructive:
-          "bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90",
-        outline:
-          "border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground",
-        secondary:
-          "bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80",
+        // primary is the main/primary button style. Keep `default` as an alias for compatibility.
+        brand: "bg-[var(--primary)] text-white hover:opacity-90 focus:ring-2 focus:ring-[var(--primary)] transition-colors",
+        primary: "bg-blue-600 text-white shadow hover:bg-blue-700 focus-visible:ring-blue-700",
+        default: "bg-blue-600 text-white shadow hover:bg-blue-700 focus-visible:ring-blue-700",
+        destructive: "bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90",
+        outline: "border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground",
+        // secondary: always black/white with outline, no color background
+        secondary: "bg-white text-black border border-black shadow-sm hover:bg-black hover:text-white focus-visible:ring-black dark:bg-black dark:text-white dark:border-white dark:hover:bg-white dark:hover:text-black focus-visible:dark:ring-white",
         ghost: "hover:bg-accent hover:text-accent-foreground",
         link: "text-primary underline-offset-4 hover:underline",
       },
@@ -27,7 +27,7 @@ const buttonVariants = cva(
       },
     },
     defaultVariants: {
-      variant: "default",
+      variant: "primary",
       size: "default",
     },
   }
