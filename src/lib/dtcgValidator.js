@@ -4,20 +4,30 @@
  */
 
 const DTCG_GROUPS = ['$schema', '$id', '$description', '$extensions', '$type'];
+const DTCG_SCHEMA_URL = 'https://www.designtokens.org/tr/2025.10/format/';
 const VALID_TOKEN_TYPES = [
   'color',
   'dimension',
+  'number',
+  'opacity',
   'fontFamily',
   'fontSize',
   'fontWeight',
   'lineHeight',
+  'letterSpacing',
+  'paragraphSpacing',
+  'textCase',
+  'textDecoration',
   'duration',
   'cubicBezier',
-  'shadow',
-  'strokeStyle',
-  'border',
   'transition',
-  'gradient'
+  'shadow',
+  'gradient',
+  'border',
+  'borderRadius',
+  'strokeStyle',
+  'typography',
+  'asset'
 ];
 
 export class DTCGValidator {
@@ -40,6 +50,23 @@ export class DTCGValidator {
         hint: 'The file must be valid JSON and be an object'
       });
       return { valid: false, errors: this.errors, warnings: this.warnings };
+    }
+
+    // Schema check
+    if (!json.$schema) {
+      this.warnings.push({
+        path: '$.$schema',
+        message: 'Missing $schema declaration',
+        severity: 'warning',
+        hint: `Add "$schema": "${DTCG_SCHEMA_URL}" to declare spec version`
+      });
+    } else if (json.$schema !== DTCG_SCHEMA_URL) {
+      this.warnings.push({
+        path: '$.$schema',
+        message: `Unexpected $schema version (found ${json.$schema})`,
+        severity: 'warning',
+        hint: `Use ${DTCG_SCHEMA_URL} for the 2025.10 format`
+      });
     }
 
     // Analyze structure issues FIRST (before validation)
@@ -224,6 +251,23 @@ export class DTCGValidator {
       }
     }
 
+    if ('value' in token && !('$value' in token)) {
+      this.warnings.push({
+        path: `$.${groupName}.${fullPath}.value`,
+        message: 'Legacy "value" key used; prefer "$value" per DTCG 2025.10',
+        severity: 'warning',
+        hint: 'Rename "value" to "$value"'
+      });
+    }
+    if ('type' in token && !('$type' in token)) {
+      this.warnings.push({
+        path: `$.${groupName}.${fullPath}.type`,
+        message: 'Legacy "type" key used; prefer "$type" per DTCG 2025.10',
+        severity: 'warning',
+        hint: 'Rename "type" to "$type"'
+      });
+    }
+
     if (token.$type) {
       if (!VALID_TOKEN_TYPES.includes(token.$type)) {
         this.warnings.push({
@@ -263,21 +307,55 @@ export class DTCGValidator {
       case 'dimension':
         this.validateDimensionValue(groupName, tokenName, value);
         break;
+      case 'number':
+        this.validateNumberValue(groupName, tokenName, value);
+        break;
+      case 'opacity':
+        this.validateOpacityValue(groupName, tokenName, value);
+        break;
       case 'fontFamily':
         this.validateFontFamilyValue(groupName, tokenName, value);
         break;
       case 'fontSize':
       case 'fontWeight':
       case 'lineHeight':
+      case 'letterSpacing':
+      case 'paragraphSpacing':
+        // These are dimensions; allow string/number/object handled by dimension validator when present
+        this.validateDimensionValue(groupName, tokenName, value);
+        break;
       case 'duration':
-        if (typeof value !== 'string' && typeof value !== 'number' && typeof value !== 'object') {
-          this.errors.push({
-            path: `$.${groupName}.${tokenName}.value`,
-            message: `Invalid ${$type} value`,
-            severity: 'error',
-            hint: `${$type} value should be a string, number, or object (DTCG)`
-          });
-        }
+        this.validateDurationValue(groupName, tokenName, value);
+        break;
+      case 'borderRadius':
+        this.validateBorderRadiusValue(groupName, tokenName, value);
+        break;
+      case 'textCase':
+        this.validateTextCaseValue(groupName, tokenName, value);
+        break;
+      case 'textDecoration':
+        this.validateTextDecorationValue(groupName, tokenName, value);
+        break;
+      case 'typography':
+        this.validateTypographyValue(groupName, tokenName, value);
+        break;
+      case 'shadow':
+        this.validateShadowValue(groupName, tokenName, value);
+        break;
+      case 'gradient':
+        this.validateGradientValue(groupName, tokenName, value);
+        break;
+      case 'border':
+        this.validateBorderValue(groupName, tokenName, value);
+        break;
+      case 'strokeStyle':
+        this.validateStrokeStyleValue(groupName, tokenName, value);
+        break;
+      case 'transition':
+        this.validateTransitionValue(groupName, tokenName, value);
+        break;
+      case 'cubicBezier':
+        this.validateCubicBezierValue(groupName, tokenName, value);
         break;
     }
   }
@@ -285,12 +363,12 @@ export class DTCGValidator {
   validateColorValue(groupName, tokenName, value) {
     // DTCG Color can be a string or a color object
     if (typeof value === 'object' && value !== null) {
-      if (!value.colorSpace || !value.components) {
+      if (!value.colorSpace || !value.channels) {
         this.errors.push({
           path: `$.${groupName}.${tokenName}.$value`,
           message: `Invalid DTCG color object`,
           severity: 'error',
-          hint: `DTCG color objects must have "colorSpace" and "components"`
+          hint: `DTCG color objects must have "colorSpace" and "channels"`
         });
       }
       return;
@@ -342,12 +420,12 @@ export class DTCGValidator {
       return;
     }
 
-    if (!/^\d+(\.\d+)?(px|rem|em|%|vh|vw|vmin|vmax|pt|cm|mm|in|pc)$/.test(value)) {
+    if (!/^\d+(\.\d+)?(px|rem|em|%|vh|vw|vmin|vmax|pt|cm|mm|in|pc|ch)$/.test(value)) {
       this.warnings.push({
         path: `$.${groupName}.${tokenName}.value`,
         message: `Unusual dimension format`,
         severity: 'warning',
-        hint: `Standard units: px, rem, em, %, vh, vw, pt, cm, mm, in, pc`
+        hint: `Standard units: px, rem, em, %, vh, vw, pt, cm, mm, in, pc, ch`
       });
     }
   }
@@ -360,6 +438,165 @@ export class DTCGValidator {
         severity: 'error',
         hint: `Use comma-separated font names or arrays: ["Inter", "sans-serif"]`
       });
+    }
+  }
+
+  validateNumberValue(groupName, tokenName, value) {
+    if (typeof value !== 'number') {
+      this.errors.push({
+        path: `$.${groupName}.${tokenName}.$value`,
+        message: 'Number token must have a numeric $value',
+        severity: 'error',
+        hint: 'Use a plain number (no unit)' 
+      });
+    }
+  }
+
+  validateOpacityValue(groupName, tokenName, value) {
+    if (typeof value !== 'number' || value < 0 || value > 1) {
+      this.errors.push({
+        path: `$.${groupName}.${tokenName}.$value`,
+        message: 'Opacity must be a number between 0 and 1',
+        severity: 'error',
+        hint: 'Example: 0.75' 
+      });
+    }
+  }
+
+  validateDurationValue(groupName, tokenName, value) {
+    const isValid = (typeof value === 'number') || (typeof value === 'string' && /^-?[\d.]+(ms|s)$/.test(value));
+    if (!isValid) {
+      this.errors.push({
+        path: `$.${groupName}.${tokenName}.$value`,
+        message: 'Duration must be number (ms) or string ending with ms/s',
+        severity: 'error',
+        hint: 'Examples: 250, "250ms", "0.2s"'
+      });
+    }
+  }
+
+  validateBorderRadiusValue(groupName, tokenName, value) {
+    const check = (v) => typeof v === 'number' || (typeof v === 'string' && /^[\d.]+(px|rem|em|%)$/.test(v));
+    if (!(check(value) || (typeof value === 'object' && value !== null && check(value.value)))) {
+      this.errors.push({
+        path: `$.${groupName}.${tokenName}.$value`,
+        message: 'Border radius must be a dimension (number or string with unit)',
+        severity: 'error',
+        hint: 'Examples: 4, "4px", { "value": 4, "unit": "px" }'
+      });
+    }
+  }
+
+  validateTextCaseValue(groupName, tokenName, value) {
+    const allowed = ['none', 'uppercase', 'lowercase', 'capitalize'];
+    if (typeof value !== 'string' || !allowed.includes(value)) {
+      this.errors.push({
+        path: `$.${groupName}.${tokenName}.$value`,
+        message: `textCase must be one of ${allowed.join(', ')}`,
+        severity: 'error'
+      });
+    }
+  }
+
+  validateTextDecorationValue(groupName, tokenName, value) {
+    const allowed = ['none', 'underline', 'line-through', 'overline'];
+    if (typeof value !== 'string' || !allowed.includes(value)) {
+      this.errors.push({
+        path: `$.${groupName}.${tokenName}.$value`,
+        message: `textDecoration must be one of ${allowed.join(', ')}`,
+        severity: 'error'
+      });
+    }
+  }
+
+  validateTypographyValue(groupName, tokenName, value) {
+    if (typeof value !== 'object' || value === null) {
+      this.errors.push({
+        path: `$.${groupName}.${tokenName}.$value`,
+        message: 'Typography must be an object',
+        severity: 'error'
+      });
+      return;
+    }
+    const required = ['fontFamily', 'fontSize', 'fontWeight', 'lineHeight'];
+    for (const r of required) {
+      if (!(r in value)) {
+        this.errors.push({
+          path: `$.${groupName}.${tokenName}.$value.${r}`,
+          message: `Typography missing ${r}`,
+          severity: 'error'
+        });
+      }
+    }
+    if ('letterSpacing' in value) this.validateDimensionValue(groupName, `${tokenName}.letterSpacing`, value.letterSpacing);
+    if ('paragraphSpacing' in value) this.validateDimensionValue(groupName, `${tokenName}.paragraphSpacing`, value.paragraphSpacing);
+    if ('textCase' in value) this.validateTextCaseValue(groupName, `${tokenName}.textCase`, value.textCase);
+    if ('textDecoration' in value) this.validateTextDecorationValue(groupName, `${tokenName}.textDecoration`, value.textDecoration);
+  }
+
+  validateShadowValue(groupName, tokenName, value) {
+    const shadows = Array.isArray(value) ? value : [value];
+    for (const [idx, shadow] of shadows.entries()) {
+      if (typeof shadow !== 'object' || shadow === null) {
+        this.errors.push({ path: `$.${groupName}.${tokenName}.$value[${idx}]`, message: 'Shadow must be an object', severity: 'error' });
+        continue;
+      }
+      const required = ['color', 'offsetX', 'offsetY', 'blur'];
+      for (const r of required) {
+        if (!(r in shadow)) {
+          this.errors.push({ path: `$.${groupName}.${tokenName}.$value[${idx}].${r}`, message: 'Shadow missing field', severity: 'error' });
+        }
+      }
+    }
+  }
+
+  validateGradientValue(groupName, tokenName, value) {
+    if (typeof value !== 'object' || value === null) {
+      this.errors.push({ path: `$.${groupName}.${tokenName}.$value`, message: 'Gradient must be an object', severity: 'error' });
+      return;
+    }
+    if (!value.stops || !Array.isArray(value.stops) || value.stops.length === 0) {
+      this.errors.push({ path: `$.${groupName}.${tokenName}.$value.stops`, message: 'Gradient requires stops', severity: 'error' });
+    }
+  }
+
+  validateBorderValue(groupName, tokenName, value) {
+    if (typeof value !== 'object' || value === null) {
+      this.errors.push({ path: `$.${groupName}.${tokenName}.$value`, message: 'Border must be an object', severity: 'error' });
+      return;
+    }
+    const required = ['color', 'width', 'style'];
+    for (const r of required) {
+      if (!(r in value)) {
+        this.errors.push({ path: `$.${groupName}.${tokenName}.$value.${r}`, message: `Border missing ${r}`, severity: 'error' });
+      }
+    }
+  }
+
+  validateStrokeStyleValue(groupName, tokenName, value) {
+    if (typeof value !== 'object' || value === null) {
+      this.errors.push({ path: `$.${groupName}.${tokenName}.$value`, message: 'Stroke style must be an object', severity: 'error' });
+      return;
+    }
+  }
+
+  validateTransitionValue(groupName, tokenName, value) {
+    if (typeof value !== 'object' || value === null) {
+      this.errors.push({ path: `$.${groupName}.${tokenName}.$value`, message: 'Transition must be an object', severity: 'error' });
+      return;
+    }
+    if (!value.duration) {
+      this.errors.push({ path: `$.${groupName}.${tokenName}.$value.duration`, message: 'Transition missing duration', severity: 'error' });
+    }
+    if (value.timingFunction && value.timingFunction.$type !== 'cubicBezier') {
+      this.warnings.push({ path: `$.${groupName}.${tokenName}.$value.timingFunction`, message: 'timingFunction should be a cubicBezier token', severity: 'warning' });
+    }
+  }
+
+  validateCubicBezierValue(groupName, tokenName, value) {
+    const arr = Array.isArray(value) ? value : value?.$value;
+    if (!Array.isArray(arr) || arr.length !== 4 || arr.some(n => typeof n !== 'number')) {
+      this.errors.push({ path: `$.${groupName}.${tokenName}.$value`, message: 'cubicBezier must be an array of four numbers', severity: 'error' });
     }
   }
 
@@ -394,9 +631,11 @@ export class DTCGValidator {
   inferTokenType(value) {
     if (typeof value === 'string') {
       if (value.startsWith('#') || value.match(/^rgb/)) return 'color';
-      if (value.match(/^\d+(\.\d+)?(px|rem|em|%)$/)) return 'dimension';
+      if (value.match(/^\d+(\.\d+)?(px|rem|em|%|vh|vw|vmin|vmax|pt|cm|mm|in|pc|ch)$/)) return 'dimension';
+      if (value.match(/^[-]?\d+(\.\d+)?(ms|s)$/)) return 'duration';
+      if (value.match(/^\d+(\.\d+)?$/)) return parseFloat(value) <= 1 ? 'opacity' : 'number';
     }
-    if (typeof value === 'number') return 'dimension';
+    if (typeof value === 'number') return value <= 1 ? 'opacity' : 'number';
     return null;
   }
 
@@ -653,24 +892,29 @@ export class DTCGValidator {
     if (hasValue || hasDollarValue) {
       let newNode = {};
       const val = hasDollarValue ? node.$value : node.value;
-      const type = hasDollarType ? node.$type : (hasType ? node.type : parentType);
-      
-      // Convert value and infer type
-      if (typeof val === 'string') {
-        if (val.startsWith('#') || val.match(/^(rgb|rgba|hsl|hsla)/)) {
-          newNode.$value = this.convertToColorObject(val);
-          newNode.$type = 'color';
-        } else if (val.match(/\d+(px|rem|em|%)/)) {
-          newNode.$value = this.parseDimension(val);
-          newNode.$type = 'dimension';
+      const resolvedType = hasDollarType ? node.$type : (hasType ? node.type : (parentType || this.inferTokenType(val)));
+
+      if (resolvedType === 'color' && typeof val === 'string') {
+        // Keep hex/color strings as-is for better readability
+        newNode.$value = val;
+      } else if (resolvedType === 'dimension' && typeof val === 'string') {
+        newNode.$value = this.parseDimension(val);
+      } else if ((resolvedType === 'number' || resolvedType === 'opacity') && typeof val === 'string' && /^-?[\d.]+$/.test(val)) {
+        const numVal = parseFloat(val);
+        // For opacity, clamp to valid range
+        if (resolvedType === 'opacity') {
+          newNode.$value = Math.max(0, Math.min(1, numVal));
         } else {
-          newNode.$value = val;
-          newNode.$type = type || 'string';
+          newNode.$value = numVal;
         }
+      } else if (resolvedType === 'opacity' && typeof val === 'number') {
+        // Ensure existing numeric opacity values are within valid range
+        newNode.$value = Math.max(0, Math.min(1, val));
       } else {
         newNode.$value = val;
-        newNode.$type = type || (typeof val === 'number' ? 'number' : 'object');
       }
+
+      newNode.$type = resolvedType || (typeof val === 'number' ? 'number' : 'string');
 
       // Preserve description
       if (node.$description || node.description) {
@@ -736,12 +980,12 @@ export class DTCGValidator {
     
     return {
       colorSpace: 'srgb',
-      components: [
-        Math.round(r * 1000) / 1000,
-        Math.round(g * 1000) / 1000,
-        Math.round(b * 1000) / 1000
-      ],
-      hex: hex.toUpperCase()
+      channels: {
+        r: Math.round(r * 1000) / 1000,
+        g: Math.round(g * 1000) / 1000,
+        b: Math.round(b * 1000) / 1000,
+        a: 1
+      }
     };
   }
   
@@ -751,15 +995,12 @@ export class DTCGValidator {
     if (rgbMatch) {
       return {
         colorSpace: 'srgb',
-        components: [
-          parseInt(rgbMatch[1]) / 255,
-          parseInt(rgbMatch[2]) / 255,
-          parseInt(rgbMatch[3]) / 255
-        ],
-        alpha: rgbMatch[4] ? parseFloat(rgbMatch[4]) : 1,
-        hex: '#' + [rgbMatch[1], rgbMatch[2], rgbMatch[3]].map(n => 
-          parseInt(n).toString(16).padStart(2, '0')
-        ).join('').toUpperCase()
+        channels: {
+          r: parseInt(rgbMatch[1]) / 255,
+          g: parseInt(rgbMatch[2]) / 255,
+          b: parseInt(rgbMatch[3]) / 255,
+          a: rgbMatch[4] ? parseFloat(rgbMatch[4]) : 1
+        }
       };
     }
     return colorStr; // Can't parse, return as-is
@@ -767,7 +1008,7 @@ export class DTCGValidator {
   
   // Helper: Parse dimension strings like "16px"
   parseDimension(dimStr) {
-    const match = dimStr.match(/([\d.]+)(px|rem|em|%)/);
+    const match = dimStr.match(/([\d.]+)(px|rem|em|%|vh|vw|vmin|vmax|pt|cm|mm|in|pc|ch)/);
     if (match) {
       return {
         value: parseFloat(match[1]),
