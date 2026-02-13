@@ -7,90 +7,206 @@
   },
   "colors": {
     "primary": {
-      "value": "#E00069",
-      "$type": "color"
+      "DEFAULT": "#E00069",
+      "light": "#FFAED4",
+      "lighter": "#FFD7F1"
     },
     "secondary": {
-      "blue": {
-        "value": "#4c53fb",
-        "$type": "color"
-      },
       "orange": {
-        "value": "#ff7145",
-        "$type": "color"
+        "DEFAULT": "#ff7145",
+        "light": "#ff9769",
+        "lighter": "#ffc6be"
+      },
+      "yellow": {
+        "DEFAULT": "#fad630",
+        "light": "#ffc87b",
+        "lighter": "#fcf3b1"
+      },
+      "blue": {
+        "DEFAULT": "#4c53fb",
+        "light": "#b085ff",
+        "lighter": "#cfd6ff"
+      },
+      "teal": {
+        "DEFAULT": "#40c6ae",
+        "light": "#98edce",
+        "lighter": "#aae5e6"
       }
     },
     "neutral": {
-      "50": {
-        "value": "#fffdfd",
-        "$type": "color"
-      },
-      "100": {
-        "value": "#f9f6f6",
-        "$type": "color"
-      },
-      "500": {
-        "value": "#a8a4a4",
-        "$type": "color"
-      },
-      "900": {
-        "value": "#443d3d",
-        "$type": "color"
+      "50": "#fffdfd",
+      "100": "#f9f6f6",
+      "200": "#e4e0e0",
+      "300": "#d2cece",
+      "400": "#c0bcbc",
+      "500": "#a8a4a4",
+      "600": "#928c8c",
+      "700": "#746d6d",
+      "800": "#584f4f",
+      "900": "#443d3d",
+      "950": "#251f1f"
+    },
+    "neutralDark": {
+      "50": "#251f1f",
+      "100": "#443d3d",
+      "200": "#584f4f",
+      "300": "#746d6d",
+      "400": "#928c8c",
+      "500": "#a8a4a4",
+      "600": "#c0bcbc",
+      "700": "#d2cece",
+      "800": "#e4e0e0",
+      "900": "#f9f6f6",
+      "950": "#fffdfd"
+    },
+    "ui": {
+      "background": "#fffdfd",
+      "backgroundAlt": "#fcf3b1",
+      "border": "#d3dce5",
+      "text": {
+        "primary": "#443d3d",
+        "secondary": "#584f4f",
+        "tertiary": "#a8a4a4",
+        "label": "#b7bfdc",
+        "accent": "#E00069"
       }
     }
   },
   "typography": {
     "fontFamilies": {
-      "primary": {
-        "value": "Inter",
-        "$type": "fontFamily"
-      },
-      "secondary": {
-        "value": "Roboto",
-        "$type": "fontFamily"
-      }
+      "primary": "Chivo",
+      "secondary": "DM Sans",
+      "note": "Available in Google Fonts"
     },
-    "fontSize": {
-      "heading": {
-        "value": "32px",
-        "$type": "fontSize"
+    "textStyles": {
+      "h1": {
+        "fontFamily": "Chivo",
+        "fontWeight": "bold",
+        "fontSize": "40px",
+        "lineHeight": "normal",
+        "letterSpacing": "-0.8px"
       },
-      "body": {
-        "value": "16px",
-        "$type": "fontSize"
+      "h2": {
+        "fontFamily": "Chivo",
+        "fontWeight": "bold",
+        "fontSize": "24px",
+        "lineHeight": "30px",
+        "letterSpacing": "0"
       },
-      "caption": {
-        "value": "12px",
-        "$type": "fontSize"
-      }
-    },
-    "fontWeight": {
-      "bold": {
-        "value": "700",
-        "$type": "fontWeight"
+      "h3": {
+        "fontFamily": "Chivo",
+        "fontWeight": "black",
+        "fontSize": "16px",
+        "lineHeight": "22px",
+        "letterSpacing": "-0.32px"
       },
-      "regular": {
-        "value": "400",
-        "$type": "fontWeight"
+      "sub1": {
+        "fontFamily": "Chivo",
+        "fontWeight": "bold",
+        "fontSize": "22px",
+        "lineHeight": "30px",
+        "letterSpacing": "0"
+      },
+      "sub2": {
+        "fontFamily": "Chivo",
+        "fontWeight": "bold",
+        "fontSize": "18px",
+        "lineHeight": "22px",
+        "letterSpacing": "0"
+      },
+      "sub3": {
+        "fontFamily": "Chivo",
+        "fontWeight": "bold",
+        "fontSize": "16px",
+        "lineHeight": "22px",
+        "letterSpacing": "0"
+      },
+      "body1": {
+        "fontFamily": "DM Sans",
+        "fontWeight": "regular",
+        "fontSize": "18px",
+        "lineHeight": "22px",
+        "letterSpacing": "-0.36px",
+        "fontVariationSettings": "'opsz' 14"
+      },
+      "body2": {
+        "fontFamily": "DM Sans",
+        "fontWeight": "medium",
+        "fontSize": "16px",
+        "lineHeight": "20px",
+        "letterSpacing": "-0.32px",
+        "fontVariationSettings": "'opsz' 14"
+      },
+      "body3": {
+        "fontFamily": "DM Sans",
+        "fontWeight": "regular",
+        "fontSize": "14px",
+        "lineHeight": "normal",
+        "letterSpacing": "0",
+        "fontVariationSettings": "'opsz' 14"
+      },
+      "button": {
+        "fontFamily": "DM Sans",
+        "fontWeight": "medium",
+        "fontSize": "18px",
+        "lineHeight": "30px",
+        "letterSpacing": "0",
+        "fontVariationSettings": "'opsz' 14"
+      },
+      "buttonSmall": {
+        "fontFamily": "DM Sans",
+        "fontWeight": "medium",
+        "fontSize": "14px",
+        "lineHeight": "22px",
+        "letterSpacing": "0",
+        "fontVariationSettings": "'opsz' 14"
+      },
+      "label1": {
+        "fontFamily": "DM Sans",
+        "fontWeight": "medium",
+        "fontSize": "14px",
+        "lineHeight": "22px",
+        "letterSpacing": "0",
+        "fontVariationSettings": "'opsz' 14"
+      },
+      "label2": {
+        "fontFamily": "DM Sans",
+        "fontWeight": "medium",
+        "fontSize": "12px",
+        "lineHeight": "12px",
+        "letterSpacing": "0",
+        "fontVariationSettings": "'opsz' 14"
+      },
+      "placeholder": {
+        "fontFamily": "DM Sans",
+        "fontWeight": "regular",
+        "fontStyle": "italic",
+        "fontSize": "12px",
+        "lineHeight": "22px",
+        "letterSpacing": "-0.24px",
+        "fontVariationSettings": "'opsz' 14"
       }
     }
   },
-  "spacing": {
-    "small": {
-      "value": "8px",
-      "$type": "dimension"
+  "iconography": {
+    "library": "Material Symbols",
+    "source": "Google Material.io",
+    "style": "Outline",
+    "weight": 400
+  },
+  "usage": {
+    "description": "This design system provides colors and typography styles for the UINK WEB brand. Use the color tokens for consistent theming across applications and the text styles for proper typography hierarchy.",
+    "colorPalette": {
+      "primary": "Use primary colors for main brand elements and call-to-action components",
+      "grayscale": "Use grayscale for text, backgrounds, borders, and neutral elements",
+      "accent": "Use the primary color for highlights and brand elements"
     },
-    "medium": {
-      "value": "16px",
-      "$type": "dimension"
-    },
-    "large": {
-      "value": "32px",
-      "$type": "dimension"
-    },
-    "xlarge": {
-      "value": "64px",
-      "$type": "dimension"
+    "typographyHierarchy": {
+      "headings": "Use h1-h3 for page and section titles",
+      "subheadings": "Use sub1-sub3 for subsections and card titles",
+      "body": "Use body1-body3 for paragraph text and content",
+      "interactive": "Use button styles for clickable elements",
+      "labels": "Use label styles for form fields, tags, and small text"
     }
   }
 }

@@ -256,6 +256,7 @@ export default function App() {
   // Sync Theme with DOM
   useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark');
+    document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem('theme', theme);
     if (monaco) {
       registerMonacoThemes(monaco);
@@ -409,8 +410,12 @@ export default function App() {
         {/* Floating Topbar */}
         <header className="fixed top-4 inset-x-4 max-w-[1600px] mx-auto h-16 border rounded-2xl bg-background/80 backdrop-blur-xl z-50 flex items-center justify-between px-6 shadow-2xl">
           <div className="flex items-center gap-4">
-            <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center shadow-lg shadow-primary/20">
-              <FileJson className="w-6 h-6 text-primary-foreground" />
+            <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center shadow-lg shadow-primary/20 overflow-hidden">
+              <img
+                src="/uink-avatar.png"
+                alt="Uink avatar"
+                className="w-full h-full object-cover"
+              />
             </div>
             <div>
               <h1 className="text-sm font-bold tracking-tight">BRAND DESIGN TOOL</h1>
