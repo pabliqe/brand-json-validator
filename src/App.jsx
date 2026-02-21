@@ -279,6 +279,13 @@ export default function App() {
     if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
   }, []);
 
+  // Auto-switch to Preview tab when validation is successful
+  useEffect(() => {
+    if (validationResult && validationResult.valid) {
+      setTabValue('preview');
+    }
+  }, [validationResult]);
+
   // Sync Monaco Markers
   useEffect(() => {
     if (monaco && editorRef.current && validationResult) {
