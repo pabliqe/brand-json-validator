@@ -57,6 +57,63 @@ export default function App() {
   const highlightTimerRef = useRef(null);
   const monaco = useMonaco();
   const monacoThemesDefined = useRef(false);
+  const hasEditorContent = jsonText.trim().length > 0;
+
+  const findPathPositionInLines = useCallback((pathOrParts, lines) => {
+    const pathParts = typeof pathOrParts === 'string'
+      ? pathOrParts.split('.').filter(p => p !== '$')
+      : pathOrParts;
+
+    if (!pathParts || pathParts.length === 0) return null;
+
+    let foundLine = -1;
+    let column = 1;
+
+    for (let depth = pathParts.length - 1; depth >= 0; depth--) {
+      const targetKey = pathParts[depth];
+      const pattern = `"${targetKey}"`;
+
+      if (depth > 0) {
+        const parentKey = pathParts[depth - 1];
+        let parentLine = -1;
+
+        for (let i = 0; i < lines.length; i++) {
+          if (lines[i].includes(`"${parentKey}"`)) {
+            parentLine = i;
+            break;
+          }
+        }
+
+        if (parentLine !== -1) {
+          for (let i = parentLine + 1; i < lines.length; i++) {
+            const idx = lines[i].indexOf(pattern);
+            if (idx !== -1) {
+              foundLine = i + 1;
+              column = idx + 2;
+              break;
+            }
+            if (lines[i].match(/^\s{0,2}"/) && !lines[i].includes(pattern)) {
+              break;
+            }
+          }
+          if (foundLine !== -1) break;
+        }
+      } else {
+        for (let i = 0; i < lines.length; i++) {
+          const idx = lines[i].indexOf(pattern);
+          if (idx !== -1) {
+            foundLine = i + 1;
+            column = idx + 2;
+            break;
+          }
+        }
+        if (foundLine !== -1) break;
+      }
+    }
+
+    if (foundLine === -1) return null;
+    return { lineNumber: foundLine, column };
+  }, []);
 
   const handleRevealPath = useCallback((pathOrParts) => {
     console.log('🔍 handleRevealPath called with:', pathOrParts);
@@ -72,81 +129,15 @@ export default function App() {
       return;
     }
 
-    // Parse path if it's a string like "$.typography.letterSpacing.$value"
-    const pathParts = typeof pathOrParts === 'string' 
-      ? pathOrParts.split('.').filter(p => p !== '$')
-      : pathOrParts;
-
-    console.log('📍 Path parts:', pathParts);
-    
-    if (!pathParts || pathParts.length === 0) {
-      console.log('❌ No path parts');
-      return;
-    }
-
     const lines = model.getValue().split('\n');
-    let foundLine = -1;
-    let column = 1;
+    const position = findPathPositionInLines(pathOrParts, lines);
+    console.log('✅ Found position:', position);
 
-    console.log('📄 Total lines:', lines.length);
-    console.log('🔎 Searching for path parts:', pathParts);
-
-    // Strategy: Search for the deepest unique key in context
-    // For nested paths, search backwards through parent keys for better accuracy
-    for (let depth = pathParts.length - 1; depth >= 0; depth--) {
-      const targetKey = pathParts[depth];
-      const pattern = `"${targetKey}"`;
-      
-      // If we have parent context, try to find the key after the parent
-      if (depth > 0) {
-        const parentKey = pathParts[depth - 1];
-        let parentLine = -1;
-        
-        for (let i = 0; i < lines.length; i++) {
-          if (lines[i].includes(`"${parentKey}"`)) {
-            parentLine = i;
-            break;
-          }
-        }
-        
-        // Search for target key after parent line
-        if (parentLine !== -1) {
-          for (let i = parentLine + 1; i < lines.length; i++) {
-            const idx = lines[i].indexOf(pattern);
-            if (idx !== -1) {
-              foundLine = i + 1;
-              column = idx + 2;
-              break;
-            }
-            // Stop if we hit another top-level key (dedented)
-            if (lines[i].match(/^\s{0,2}"/) && !lines[i].includes(pattern)) {
-              break;
-            }
-          }
-          if (foundLine !== -1) break;
-        }
-      } else {
-        // Top-level key, search from start
-        for (let i = 0; i < lines.length; i++) {
-          const idx = lines[i].indexOf(pattern);
-          if (idx !== -1) {
-            foundLine = i + 1;
-            column = idx + 2;
-            break;
-          }
-        }
-        if (foundLine !== -1) break;
-      }
-    }
-
-    console.log('✅ Found line:', foundLine, 'column:', column);
-    
-    if (foundLine === -1) {
+    if (!position) {
       console.log('❌ Could not find target in JSON');
       return;
     }
 
-    const position = { lineNumber: foundLine, column };
     editorRef.current.revealPositionInCenter(position);
     editorRef.current.setPosition(position);
     editorRef.current.focus();
@@ -158,7 +149,7 @@ export default function App() {
       highlightDecorations.current,
       [
         {
-          range: new monaco.Range(foundLine, 1, foundLine, 1),
+          range: new monaco.Range(position.lineNumber, 1, position.lineNumber, 1),
           options: {
             isWholeLine: true,
             className: 'monaco-line-highlight-glow',
@@ -173,7 +164,7 @@ export default function App() {
         highlightDecorations.current = editorRef.current.deltaDecorations(highlightDecorations.current, []);
       }
     }, 1200);
-  }, [monaco]);
+  }, [monaco, findPathPositionInLines]);
 
   const registerMonacoThemes = useCallback((monacoInstance) => {
     if (!monacoInstance || monacoThemesDefined.current) return;
@@ -181,26 +172,26 @@ export default function App() {
       base: 'vs-dark',
       inherit: true,
       rules: [
-        { token: 'string.key.json', foreground: 'a5d6ff' },
-        { token: 'string.value.json', foreground: '7dd3fc' },
-        { token: 'number', foreground: 'c084fc' },
-        { token: 'keyword.json', foreground: 'cbd5e1' },
+        { token: 'string.key.json', foreground: 'd2cece' },
+        { token: 'string.value.json', foreground: 'f9f6f6' },
+        { token: 'number', foreground: 'ffaed4' },
+        { token: 'keyword.json', foreground: 'a8a4a4' },
       ],
       colors: {
-        'editor.background': '#0a0e27',
-        'editor.foreground': '#e0e7ff',
-        'editor.lineHighlightBackground': '#1e293b',
-        'editor.selectionBackground': '#334155',
-        'editorCursor.foreground': '#e0e7ff',
-        'editorLineNumber.foreground': '#475569',
-        'editorLineNumber.activeForeground': '#94a3b8',
-        'editorGutter.background': '#0a0e27',
-        'editorIndentGuide.background': '#1e293b',
-        'editorIndentGuide.activeBackground': '#334155',
-        'editorBracketMatch.background': '#334155',
-        'editorBracketMatch.border': '#64748b',
-        'editorWidget.background': '#1e293b',
-        'editorWidget.border': '#334155',
+        'editor.background': '#251f1f',
+        'editor.foreground': '#f9f6f6',
+        'editor.lineHighlightBackground': '#443d3d',
+        'editor.selectionBackground': '#584f4f',
+        'editorCursor.foreground': '#ffd7f1',
+        'editorLineNumber.foreground': '#746d6d',
+        'editorLineNumber.activeForeground': '#d2cece',
+        'editorGutter.background': '#251f1f',
+        'editorIndentGuide.background': '#443d3d',
+        'editorIndentGuide.activeBackground': '#746d6d',
+        'editorBracketMatch.background': '#584f4f',
+        'editorBracketMatch.border': '#928c8c',
+        'editorWidget.background': '#443d3d',
+        'editorWidget.border': '#746d6d',
       }
     });
 
@@ -208,26 +199,26 @@ export default function App() {
       base: 'vs',
       inherit: true,
       rules: [
-        { token: 'string.key.json', foreground: '1e40af' },
-        { token: 'string.value.json', foreground: '0284c7' },
-        { token: 'number', foreground: '9333ea' },
-        { token: 'keyword.json', foreground: '475569' },
+        { token: 'string.key.json', foreground: '443d3d' },
+        { token: 'string.value.json', foreground: '251f1f' },
+        { token: 'number', foreground: 'e00069' },
+        { token: 'keyword.json', foreground: '746d6d' },
       ],
       colors: {
-        'editor.background': '#ffffff',
-        'editor.foreground': '#0f172a',
-        'editor.lineHighlightBackground': '#f8fafc',
-        'editor.selectionBackground': '#e2e8f0',
-        'editorCursor.foreground': '#0f172a',
-        'editorLineNumber.foreground': '#cbd5e1',
-        'editorLineNumber.activeForeground': '#64748b',
-        'editorGutter.background': '#ffffff',
-        'editorIndentGuide.background': '#f1f5f9',
-        'editorIndentGuide.activeBackground': '#e2e8f0',
-        'editorBracketMatch.background': '#e2e8f0',
-        'editorBracketMatch.border': '#94a3b8',
-        'editorWidget.background': '#f8fafc',
-        'editorWidget.border': '#e2e8f0',
+        'editor.background': '#fffdfd',
+        'editor.foreground': '#251f1f',
+        'editor.lineHighlightBackground': '#f9f6f6',
+        'editor.selectionBackground': '#e4e0e0',
+        'editorCursor.foreground': '#443d3d',
+        'editorLineNumber.foreground': '#c0bcbc',
+        'editorLineNumber.activeForeground': '#746d6d',
+        'editorGutter.background': '#fffdfd',
+        'editorIndentGuide.background': '#e4e0e0',
+        'editorIndentGuide.activeBackground': '#c0bcbc',
+        'editorBracketMatch.background': '#e4e0e0',
+        'editorBracketMatch.border': '#a8a4a4',
+        'editorWidget.background': '#f9f6f6',
+        'editorWidget.border': '#d2cece',
       }
     });
 
@@ -297,28 +288,25 @@ export default function App() {
       const allIssues = [...validationResult.errors, ...validationResult.warnings];
       
       allIssues.forEach(err => {
+        const position = findPathPositionInLines(err.path, lines);
+        if (!position) return;
+
         const pathParts = err.path.split('.').filter(p => p !== '$');
-        const lastPart = pathParts[pathParts.length - 1];
-        
-        for (let i = 0; i < lines.length; i++) {
-          if (lines[i].includes(`"${lastPart}"`)) {
-            const colStart = lines[i].indexOf(`"${lastPart}"`) + 1;
-            markers.push({
-              startLineNumber: i + 1,
-              startColumn: colStart,
-              endLineNumber: i + 1,
-              endColumn: colStart + lastPart.length + 2,
-              message: `${err.message}${err.hint ? `\n\nHint: ${err.hint}` : ''}`,
-              severity: validationResult.errors.includes(err) ? monaco.MarkerSeverity.Error : monaco.MarkerSeverity.Warning
-            });
-            break;
-          }
-        }
+        const targetPart = pathParts[pathParts.length - 1] || '$value';
+
+        markers.push({
+          startLineNumber: position.lineNumber,
+          startColumn: position.column,
+          endLineNumber: position.lineNumber,
+          endColumn: position.column + targetPart.length + 2,
+          message: `${err.message}${err.hint ? `\n\nHint: ${err.hint}` : ''}`,
+          severity: validationResult.errors.includes(err) ? monaco.MarkerSeverity.Error : monaco.MarkerSeverity.Warning
+        });
       });
 
       monaco.editor.setModelMarkers(model, "dtcg-validator", markers);
     }
-  }, [monaco, validationResult]); // Removed jsonText from deps to prevent infinite loop or over-triggering
+  }, [monaco, validationResult, findPathPositionInLines]); // Removed jsonText from deps to prevent infinite loop or over-triggering
 
   const validateJson = (text) => {
     if (!text.trim()) {
@@ -427,7 +415,7 @@ export default function App() {
       <WelcomeModal />
       <div className="h-screen flex flex-col bg-background text-foreground overflow-hidden">
         {/* Floating Topbar */}
-        <header className="fixed top-4 inset-x-4 max-w-[1600px] mx-auto h-16 border rounded-2xl bg-background/80 backdrop-blur-xl z-50 flex items-center justify-between px-6 shadow-2xl">
+        <header className="fixed top-4 inset-x-4 max-w-[1600px] mx-auto h-16 border rounded-xl bg-background/80 backdrop-blur-xl z-50 flex items-center justify-between px-6 shadow-xl">
           <div className="flex items-center gap-4">
             <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center shadow-lg shadow-primary/20 overflow-hidden">
               <img
@@ -479,63 +467,71 @@ export default function App() {
 
             <Separator orientation="vertical" className="h-8 mx-1" />
 
-            <Button
-              variant="brand"
-              size="sm"
-              onClick={() => fileInputRef.current?.click()}
-              className="h-9 gap-2 rounded-xl"
-            >
-              <Upload className="w-4 h-4" />
-              Upload
-            </Button>
-            
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" onClick={() => { setJsonText(''); setJsonData(null); setValidationResult(null); if (fileInputRef.current) fileInputRef.current.value = ''; }} className="h-9 w-9 rounded-xl hover:bg-destructive/10 hover:text-destructive">
-                  <Trash2 className="w-4 h-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Clear Editor</TooltipContent>
-            </Tooltip>
+            {!hasEditorContent ? (
+              <Button
+                variant="brand"
+                size="sm"
+                onClick={() => fileInputRef.current?.click()}
+                className="h-9 gap-2 rounded-xl"
+              >
+                <Upload className="w-4 h-4" />
+                Upload
+              </Button>
+            ) : (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" onClick={() => { setJsonText(''); setJsonData(null); setValidationResult(null); if (fileInputRef.current) fileInputRef.current.value = ''; }} className="h-9 w-9 rounded-xl hover:bg-destructive/10 hover:text-destructive">
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Clear Editor</TooltipContent>
+              </Tooltip>
+            )}
 
-            <Separator orientation="vertical" className="h-8 mx-1" />
+            {hasEditorContent && <Separator orientation="vertical" className="h-8 mx-1" />}
 
-
-            {validationResult && (
-              validationResult.valid ? (
-                <Button 
-                  variant="brand"
-                  disabled
-                  className="h-9 px-4 rounded-xl gap-2 bg-green-600 hover:bg-green-700 text-white border-green-700"
-                >
-                  <CheckCircle2 className="w-4 h-4 text-white" />
-                  Format OK!
-                </Button>
+            {hasEditorContent && (
+              validationResult ? (
+                validationResult.valid ? (
+                  <Button 
+                    variant="brand"
+                    disabled
+                    className="h-9 px-4 rounded-xl gap-2 bg-green-600 hover:bg-green-700 text-white border-green-700"
+                  >
+                    <CheckCircle2 className="w-4 h-4 text-white" />
+                    Format OK!
+                  </Button>
+                ) : (
+                  <Button 
+                    variant="brand"
+                    onClick={handleAutoFix}
+                    className={cn(
+                      "h-9 px-4 rounded-xl gap-2 transition-all duration-500",
+                      fixSuccess && "bg-green-600 hover:bg-green-700"
+                    )}
+                  >
+                    <Sparkles className={cn("w-4 h-4", fixSuccess ? "text-white animate-spin" : "text-white")}/>
+                    {fixSuccess ? "System Fixed" : "Magic Fix"}
+                  </Button>
+                )
               ) : (
-                <Button 
-                  variant="brand"
-                  onClick={handleAutoFix}
-                  className={cn(
-                    "h-9 px-4 rounded-xl gap-2 transition-all duration-500",
-                    fixSuccess && "bg-green-600 hover:bg-green-700"
-                  )}
-                >
-                  <Sparkles className={cn("w-4 h-4", fixSuccess ? "text-white animate-spin" : "text-white")}/>
-                  {fixSuccess ? "System Fixed" : "Magic Fix"}
+                <Button variant="brand" size="sm" disabled className="h-9 px-4 rounded-xl font-bold">
+                  Checking...
                 </Button>
               )
             )}
 
-            <Button
-              variant="brand"
-              size="sm"
-              onClick={handleExport}
-              disabled={!jsonText}
-              className="h-9 px-4 rounded-xl font-bold"
-            >
-              <Download className="w-4 h-4 mr-2" />
-              Export
-            </Button>
+            {hasEditorContent && (
+              <Button
+                variant="brand"
+                size="sm"
+                onClick={handleExport}
+                className="h-9 px-4 rounded-xl font-bold"
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Export
+              </Button>
+            )}
           </div>
         </header>
 
@@ -548,14 +544,14 @@ export default function App() {
             onDragLeave={handleDrag}
             onDrop={handleDrop}
             className={cn(
-              "flex-1 relative flex flex-col bg-card border rounded-3xl overflow-hidden shadow-sm transition-all duration-500",
+              "flex-1 relative flex flex-col bg-card border rounded-xl overflow-hidden shadow-sm transition-all duration-500",
               dragActive && "ring-2 ring-primary bg-primary/5 scale-[0.99]"
             )}
           >
             {/* Drag Overlay */}
             {dragActive && (
-              <div className="absolute inset-0 z-50 bg-primary/10 backdrop-blur-sm flex flex-col items-center justify-center border-2 border-dashed border-primary rounded-3xl pointer-events-none animate-in fade-in zoom-in duration-300">
-                <div className="w-20 h-20 bg-primary rounded-3xl flex items-center justify-center shadow-2xl animate-bounce">
+              <div className="absolute inset-0 z-50 bg-primary/10 backdrop-blur-sm flex flex-col items-center justify-center border-2 border-dashed border-primary rounded-xl pointer-events-none animate-in fade-in zoom-in duration-300">
+                <div className="w-20 h-20 bg-primary rounded-xl flex items-center justify-center shadow-2xl animate-bounce">
                   <Upload className="w-10 h-10 text-primary-foreground" />
                 </div>
                 <h2 className="mt-6 text-xl font-bold tracking-tight">Drop your JSON</h2>
@@ -571,7 +567,7 @@ export default function App() {
               {validationResult && (
                 <div className={cn(
                   "flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-tighter",
-                  validationResult.valid ? "bg-green-500/10 text-green-500" : "bg-destructive/10 text-destructive"
+                  validationResult.valid ? "bg-green-600 text-white" : "bg-destructive text-destructive-foreground"
                 )}>
                   {validationResult.valid ? <CheckCircle2 className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}
                   {validationResult.valid ? "Standard Compliant" : `${validationResult.errors.length} Errors Found`}
@@ -612,15 +608,15 @@ export default function App() {
           </section>
 
           {/* Inspection Panel */}
-          <aside className="w-96 h-full min-w-0 flex flex-col bg-card border rounded-3xl overflow-hidden shadow-sm min-h-0">
+          <aside className="w-96 h-full min-w-0 flex flex-col bg-card border rounded-xl overflow-hidden shadow-sm min-h-0">
             <Tabs value={tabValue} onValueChange={setTabValue} className="flex-1 flex flex-col min-h-0 h-full">
               <div className="p-4 shrink-0">
-                <TabsList className="w-full h-11 grid grid-cols-2 rounded-xl p-1 bg-muted/50">
-                  <TabsTrigger value="issues" className="rounded-lg gap-2 text-xs font-bold uppercase tracking-wider data-[state=active]:bg-background data-[state=active]:shadow-sm">
+                <TabsList className="w-full h-11 grid grid-cols-2 rounded-xl py-1 px-3 bg-muted/50">
+                  <TabsTrigger value="issues" className="rounded-lg gap-2 text-xs font-bold uppercase tracking-wider data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm">
                     <AlertCircle className="w-3.5 h-3.5" />
                     Inspection
                   </TabsTrigger>
-                  <TabsTrigger value="preview" className="rounded-lg gap-2 text-xs font-bold uppercase tracking-wider data-[state=active]:bg-background data-[state=active]:shadow-sm">
+                  <TabsTrigger value="preview" className="rounded-lg gap-2 text-xs font-bold uppercase tracking-wider data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm">
                     <LayoutPanelLeft className="w-3.5 h-3.5" />
                     Preview
                   </TabsTrigger>
@@ -632,7 +628,7 @@ export default function App() {
                   <div className="p-4 space-y-4 pb-4">
                     {!validationResult ? (
                       <div className="flex flex-col items-center justify-center h-64 text-center">
-                        <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mb-4">
+                        <div className="w-16 h-16 rounded-xl bg-muted flex items-center justify-center mb-4">
                           <Info className="w-8 h-8 text-muted-foreground" />
                         </div>
                         <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Awaiting Input</p>
@@ -653,12 +649,12 @@ export default function App() {
                         {validationResult.errors.map((err, i) => (
                           <div 
                             key={i} 
-                            className="group p-4 rounded-2xl border bg-muted/30 hover:bg-muted/50 transition-colors cursor-pointer"
+                            className="group p-4 rounded-xl border bg-muted/30 hover:bg-muted/50 transition-colors cursor-pointer"
                             onClick={() => handleRevealPath(err.path)}
                             title="Click to jump to location"
                           >
                             <div className="flex items-center justify-between mb-2">
-                              <span className="text-[10px] font-bold text-destructive uppercase tracking-widest px-2 py-0.5 bg-destructive/10 rounded-md">Error</span>
+                              <span className="text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-md bg-destructive text-destructive-foreground">Error</span>
                               <code className="text-[10px] text-muted-foreground font-mono group-hover:text-primary transition-colors">
                                 {err.path}
                               </code>
@@ -695,8 +691,8 @@ export default function App() {
 
             <div className="p-6 border-t bg-muted/20 flex items-center justify-center">
               <div className="flex flex-col items-center gap-1 text-center">
-                <span className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-tight">
-                  Made by <a href="https://x.com/pabliqe" target="_blank" rel="noreferrer" className="text-primary hover:underline">Pablo Armen</a>
+                <span className="text-sm font-bold text-muted-foreground/60 uppercase tracking-tight">
+                  Made by <a href="https://x.com/pabliqe" target="_blank" rel="noreferrer" className="text-primary hover:underline">Pablo Armen</a> for <a href="https://uink.com" target="_blank" rel="noreferrer" className="text-primary hover:underline">UINK</a>
                 </span>
                 <span className="text-[10px] font-bold text-muted-foreground/30 uppercase tracking-widest">Build {pkg.version}</span>
               </div>

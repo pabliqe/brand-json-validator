@@ -62,12 +62,12 @@ export function TokenPreview({ node, name, path = [], onFocusPath }) {
 
     return (
       <div
-        className="flex items-center justify-between py-2 px-3 hover:bg-muted/50 group/token rounded-xl transition-all duration-200 border border-transparent hover:border-border/50 cursor-pointer"
+        className="flex gap-2 items-center justify-between py-2 px-3 hover:bg-muted/50 group/token rounded-xl transition-all duration-200 border border-transparent hover:border-border/50 cursor-pointer"
         onClick={() => onFocusPath?.(path)}
       >
         <div className="flex flex-col min-w-0">
-          <span className="text-xs font-bold text-foreground/80 group-hover/token:text-foreground">{name}</span>
-          <span className="text-[10px] text-muted-foreground font-mono truncate max-w-[120px]">
+          <span className="text-md font-bold text-foreground/80 group-hover/token:text-foreground">{name}</span>
+          <span className="text-[10px] text-muted-foreground font-mono truncate max-w-full">
             {valueDisplay}
           </span>
         </div>

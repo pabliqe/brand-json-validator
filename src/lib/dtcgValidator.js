@@ -271,7 +271,7 @@ export class DTCGValidator {
     if (token.$type) {
       if (!VALID_TOKEN_TYPES.includes(token.$type)) {
         this.warnings.push({
-          path: `$.${groupName}.${tokenName}.$type`,
+          path: `$.${groupName}.${fullPath}.$type`,
           message: `Unknown token type: "${token.$type}"`,
           severity: 'warning',
           hint: `Valid types: ${VALID_TOKEN_TYPES.join(', ')}`
@@ -279,10 +279,10 @@ export class DTCGValidator {
       }
     } else if ('$value' in token || 'value' in token) {
       const val = token.$value || token.value;
-      const inferredType = this.inferTokenType(val);
+      const inferredType = this.inferTokenType(val, tokenName);
       if (inferredType) {
         this.warnings.push({
-          path: `$.${groupName}.${tokenName}`,
+          path: `$.${groupName}.${fullPath}`,
           message: `Missing $type - inferred as "${inferredType}"`,
           severity: 'warning',
           hint: `Add "$type": "${inferredType}" for DTCG compliance`,
@@ -292,29 +292,29 @@ export class DTCGValidator {
     }
 
     if (token.$type) {
-      this.validateTokenValue(groupName, tokenName, token);
+      this.validateTokenValue(groupName, fullPath, token);
     }
   }
 
-  validateTokenValue(groupName, tokenName, token) {
+  validateTokenValue(groupName, tokenPath, token) {
     const { $type } = token;
     const value = token.$value || token.value;
 
     switch ($type) {
       case 'color':
-        this.validateColorValue(groupName, tokenName, value);
+        this.validateColorValue(groupName, tokenPath, value);
         break;
       case 'dimension':
-        this.validateDimensionValue(groupName, tokenName, value);
+        this.validateDimensionValue(groupName, tokenPath, value);
         break;
       case 'number':
-        this.validateNumberValue(groupName, tokenName, value);
+        this.validateNumberValue(groupName, tokenPath, value);
         break;
       case 'opacity':
-        this.validateOpacityValue(groupName, tokenName, value);
+        this.validateOpacityValue(groupName, tokenPath, value);
         break;
       case 'fontFamily':
-        this.validateFontFamilyValue(groupName, tokenName, value);
+        this.validateFontFamilyValue(groupName, tokenPath, value);
         break;
       case 'fontSize':
       case 'fontWeight':
@@ -322,40 +322,40 @@ export class DTCGValidator {
       case 'letterSpacing':
       case 'paragraphSpacing':
         // These are dimensions; allow string/number/object handled by dimension validator when present
-        this.validateDimensionValue(groupName, tokenName, value);
+        this.validateDimensionValue(groupName, tokenPath, value);
         break;
       case 'duration':
-        this.validateDurationValue(groupName, tokenName, value);
+        this.validateDurationValue(groupName, tokenPath, value);
         break;
       case 'borderRadius':
-        this.validateBorderRadiusValue(groupName, tokenName, value);
+        this.validateBorderRadiusValue(groupName, tokenPath, value);
         break;
       case 'textCase':
-        this.validateTextCaseValue(groupName, tokenName, value);
+        this.validateTextCaseValue(groupName, tokenPath, value);
         break;
       case 'textDecoration':
-        this.validateTextDecorationValue(groupName, tokenName, value);
+        this.validateTextDecorationValue(groupName, tokenPath, value);
         break;
       case 'typography':
-        this.validateTypographyValue(groupName, tokenName, value);
+        this.validateTypographyValue(groupName, tokenPath, value);
         break;
       case 'shadow':
-        this.validateShadowValue(groupName, tokenName, value);
+        this.validateShadowValue(groupName, tokenPath, value);
         break;
       case 'gradient':
-        this.validateGradientValue(groupName, tokenName, value);
+        this.validateGradientValue(groupName, tokenPath, value);
         break;
       case 'border':
-        this.validateBorderValue(groupName, tokenName, value);
+        this.validateBorderValue(groupName, tokenPath, value);
         break;
       case 'strokeStyle':
-        this.validateStrokeStyleValue(groupName, tokenName, value);
+        this.validateStrokeStyleValue(groupName, tokenPath, value);
         break;
       case 'transition':
-        this.validateTransitionValue(groupName, tokenName, value);
+        this.validateTransitionValue(groupName, tokenPath, value);
         break;
       case 'cubicBezier':
-        this.validateCubicBezierValue(groupName, tokenName, value);
+        this.validateCubicBezierValue(groupName, tokenPath, value);
         break;
     }
   }
@@ -420,7 +420,10 @@ export class DTCGValidator {
       return;
     }
 
-    if (!/^\d+(\.\d+)?(px|rem|em|%|vh|vw|vmin|vmax|pt|cm|mm|in|pc|ch)$/.test(value)) {
+    const isDimensionWithUnit = /^-?\d+(\.\d+)?(px|rem|em|%|vh|vw|vmin|vmax|pt|cm|mm|in|pc|ch)$/.test(value);
+    const isUnitlessZero = /^-?0+(\.0+)?$/.test(value);
+
+    if (!isDimensionWithUnit && !isUnitlessZero) {
       this.warnings.push({
         path: `$.${groupName}.${tokenName}.value`,
         message: `Unusual dimension format`,
@@ -613,7 +616,7 @@ export class DTCGValidator {
       
       if (typeof value === 'string' || typeof value === 'number') {
         // Direct value - create proper token
-        const inferredType = this.inferTokenType(value);
+        const inferredType = this.inferTokenType(value, flatKey);
         result[flatKey] = {
           value: value,
           ...(inferredType && { $type: inferredType })
@@ -628,14 +631,17 @@ export class DTCGValidator {
     return result;
   }
 
-  inferTokenType(value) {
+  inferTokenType(value, tokenName = '') {
     if (typeof value === 'string') {
       if (value.startsWith('#') || value.match(/^rgb/)) return 'color';
-      if (value.match(/^\d+(\.\d+)?(px|rem|em|%|vh|vw|vmin|vmax|pt|cm|mm|in|pc|ch)$/)) return 'dimension';
+      if (value.match(/^-?\d+(\.\d+)?(px|rem|em|%|vh|vw|vmin|vmax|pt|cm|mm|in|pc|ch)$/) || value.match(/^-?0+(\.0+)?$/)) return 'dimension';
       if (value.match(/^[-]?\d+(\.\d+)?(ms|s)$/)) return 'duration';
-      if (value.match(/^\d+(\.\d+)?$/)) return parseFloat(value) <= 1 ? 'opacity' : 'number';
+      if (value.match(/^\d+(\.\d+)?$/)) {
+        const numeric = parseFloat(value);
+        return numeric <= 1 && /(opacity|alpha)/i.test(tokenName) ? 'opacity' : 'number';
+      }
     }
-    if (typeof value === 'number') return value <= 1 ? 'opacity' : 'number';
+    if (typeof value === 'number') return value <= 1 && /(opacity|alpha)/i.test(tokenName) ? 'opacity' : 'number';
     return null;
   }
 
@@ -662,7 +668,7 @@ export class DTCGValidator {
             
             // Infer $type if missing
             if (!flattened[newKey].$type && 'value' in value) {
-              const inferredType = this.inferTokenType(value.value);
+              const inferredType = this.inferTokenType(value.value, newKey);
               if (inferredType) {
                 flattened[newKey].$type = inferredType;
               }
@@ -725,7 +731,7 @@ export class DTCGValidator {
       
       if (typeof value === 'object' && value !== null) {
         if ('value' in value && !('$type' in value)) {
-          const inferredType = this.inferTokenType(value.value);
+          const inferredType = this.inferTokenType(value.value, key);
           if (inferredType) {
             fixes.push({
               id: `fix-${fixes.length}`,
@@ -838,7 +844,7 @@ export class DTCGValidator {
       for (const [tokenName, token] of Object.entries(group)) {
         if (tokenName.startsWith('$') || typeof token !== 'object') continue;
         if ('value' in token && !('$type' in token)) {
-          const inferred = this.inferTokenType(token.value);
+          const inferred = this.inferTokenType(token.value, tokenName);
           if (inferred) {
             token.$type = inferred;
             fixed_count++;
@@ -1008,7 +1014,7 @@ export class DTCGValidator {
   
   // Helper: Parse dimension strings like "16px"
   parseDimension(dimStr) {
-    const match = dimStr.match(/([\d.]+)(px|rem|em|%|vh|vw|vmin|vmax|pt|cm|mm|in|pc|ch)/);
+    const match = dimStr.match(/(-?[\d.]+)(px|rem|em|%|vh|vw|vmin|vmax|pt|cm|mm|in|pc|ch)/);
     if (match) {
       return {
         value: parseFloat(match[1]),
